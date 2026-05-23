@@ -6,7 +6,7 @@
 <meta http-equiv="Expires" content="0">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>DuPod Production Control System v1.10.79</title>
+  <title>DuPod Production Control System v1.10.82</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js">
 
 /* ============================================================
@@ -1061,7 +1061,7 @@
       </div>
     </div>
   </section>
-</main><div class="footer">DuPod Production Control System v1.10.79</div>
+</main><div class="footer">DuPod Production Control System v1.10.82</div>
 
 
   <section id="stationreport" class="section">
@@ -8125,7 +8125,7 @@ try{ if(typeof submitCompleteQtyModal==='function') window.submitCompleteQtyModa
      completion log values are reconciled before rendering/export.
    ============================================================ */
 (function(){
-  try{ if(typeof APP_VERSION!=='undefined') APP_VERSION='v1.10.79'; }catch(e){}
+  try{ if(typeof APP_VERSION!=='undefined') APP_VERSION='v1.10.81'; }catch(e){}
   function n(v){ return Number(v||0)||0; }
   function linePrefix(w,l){ return String((w&&w.id)||'')+'|'+String((l&&l.id)||'')+'|'; }
   function sameOrderLine(e,w,l){
@@ -8226,9 +8226,425 @@ try{ if(typeof submitCompleteQtyModal==='function') window.submitCompleteQtyModa
   }
 })();
 
+
+
+/* ============================================================
+   v1.10.81 - Daily Demand duplicate slab request guard
+   - Prevents duplicate slab release lines for same Date + Project + Pod Type.
+   - Merges duplicate Daily Demand preview/import lines by slab key.
+   - Consolidates duplicate release queue rows before shipment, delivery, and WO generation.
+   - Delivery WO generation is idempotent per release line; duplicate clicks cannot generate extra WOs.
+   ============================================================ */
+(function(){
+  try{ if(typeof APP_VERSION!=='undefined') APP_VERSION='v1.10.81'; }catch(e){}
+  function n(v){ return Number(v||0)||0; }
+  function clean(v){ return String(v||'').trim(); }
+  function slabDemandKey(x){ return [clean(x&&x.date), clean(x&&x.project).toUpperCase(), clean(x&&x.pod).toUpperCase()].join('|'); }
+  function htmlSafe(v){ return (typeof htmlEscape==='function')?htmlEscape(v):String(v||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+  function activeReleaseStatus(r){ return !/Closed|Cancelled|Rejected/i.test(String((r&&r.status)||'')); }
+  function mergeText(a,b){ a=clean(a); b=clean(b); if(!a)return b; if(!b||a===b)return a; return a+' | '+b; }
+  function combineLocation(a,b){ a=clean(a); b=clean(b); if(!a)return b; if(!b||a===b)return a; return 'Multiple'; }
+  function mergeDemandObjects(base, add){
+    base.qty=n(base.qty)+n(add.qty);
+    base.priority=Math.min(n(base.priority)||1, n(add.priority)||1);
+    base.remarks=mergeText(base.remarks, add.remarks || 'Merged duplicate demand line');
+    base.building=combineLocation(base.building, add.building);
+    base.level=combineLocation(base.level, add.level);
+    base.mergedCount=n(base.mergedCount||1)+1;
+    return base;
+  }
+  window.mergeDuplicateDemandPreview=function(showMsg){
+    try{
+      state.demandPreview=state.demandPreview||[];
+      const map={}, out=[]; let merged=0;
+      state.demandPreview.forEach(d=>{
+        d.date=d.date||today(); d.project=clean(d.project); d.pod=clean(d.pod); d.qty=n(d.qty); d.priority=n(d.priority)||1;
+        const k=slabDemandKey(d);
+        if(map[k]){ mergeDemandObjects(map[k], d); merged++; }
+        else { map[k]=Object.assign({id:crypto.randomUUID()}, d); out.push(map[k]); }
+      });
+      state.demandPreview=out;
+      if(merged && showMsg) alert(`${merged} duplicate daily demand line(s) were merged by Date + Project + Pod Type. Slab release will be created as one request per pod type.`);
+      return merged;
+    }catch(err){ console.warn('Demand duplicate merge failed', err); return 0; }
+  };
+  function mergeReleaseRows(base, add){
+    base.demandQty=n(base.demandQty)+n(add.demandQty);
+    base.availableStock=Math.max(n(base.availableStock), n(add.availableStock));
+    base.releaseQty=n(base.releaseQty)+n(add.releaseQty);
+    base.requestedQty=n(base.requestedQty)+n(add.requestedQty||add.releaseQty);
+    base.shippedQty=n(base.shippedQty)+n(add.shippedQty);
+    base.deliveredQty=n(base.deliveredQty)+n(add.deliveredQty);
+    base.woGeneratedQty=n(base.woGeneratedQty)+n(add.woGeneratedQty);
+    base.shipNow=Math.max(0,n(base.releaseQty)-n(base.shippedQty));
+    base.deliverNow=Math.max(0,n(base.shippedQty)-n(base.deliveredQty));
+    base.priority=Math.min(n(base.priority)||1, n(add.priority)||1);
+    base.remarks=mergeText(base.remarks, add.remarks || 'Merged duplicate release request');
+    base.building=combineLocation(base.building, add.building);
+    base.level=combineLocation(base.level, add.level);
+    if(/WO Generated/i.test(String(add.status||''))) base.status='WO Generated';
+    else if(/Shipped/i.test(String(add.status||'')) && !/WO Generated/i.test(String(base.status||''))) base.status='Shipped - Pending Delivery';
+    else if(!base.status) base.status=add.status||'Pending Shipment';
+    base.mergedReleaseIds=(base.mergedReleaseIds||[]).concat(add.id, add.mergedReleaseIds||[]).filter(Boolean);
+    return base;
+  }
+  window.consolidateDuplicateReleaseQueue=function(showMsg){
+    try{
+      state.releaseQueue=state.releaseQueue||[];
+      const map={}, out=[]; let merged=0;
+      state.releaseQueue.forEach(r=>{
+        try{ if(typeof normalizeRelease==='function') normalizeRelease(r); }catch(e){}
+        const k=slabDemandKey(r)+'|'+clean(r.batch);
+        if(map[k] && activeReleaseStatus(r) && activeReleaseStatus(map[k])){ mergeReleaseRows(map[k], r); merged++; }
+        else { map[k]=r; out.push(r); }
+      });
+      state.releaseQueue=out;
+      if(merged && showMsg) alert(`${merged} duplicate slab release line(s) were consolidated. Shipment, delivery, and work-order generation will use one line per Date + Project + Pod Type.`);
+      return merged;
+    }catch(err){ console.warn('Release queue consolidation failed', err); return 0; }
+  };
+
+  const oldAddDemandPreview=window.addDemandPreview;
+  window.addDemandPreview=function(){
+    try{
+      const p=clean(document.getElementById('demProject')?.value), pod=clean(document.getElementById('demPod')?.value), qty=n(document.getElementById('demQty')?.value);
+      const d={id:crypto.randomUUID(),date:document.getElementById('demDate')?.value||today(),project:p,pod:pod,qty:qty,priority:n(document.getElementById('demPriority')?.value)||1,building:clean(document.getElementById('demBuilding')?.value),level:clean(document.getElementById('demLevel')?.value),remarks:document.getElementById('demRemarks')?.value||''};
+      if(!p||!pod||qty<=0) return alert('Add valid demand.');
+      if(typeof isProjectPodActive==='function' && !isProjectPodActive(p,pod)) return alert('Cannot add demand. This Project + Pod Type is inactive or missing from the master.');
+      state.demandPreview=state.demandPreview||[];
+      const existing=state.demandPreview.find(x=>slabDemandKey(x)===slabDemandKey(d));
+      if(existing){ mergeDemandObjects(existing,d); alert(`Duplicate slab request detected for ${p} / ${pod}. The quantity was merged into the existing preview line instead of creating a second slab release line.`); }
+      else state.demandPreview.push(d);
+      if(typeof save==='function') save(); if(typeof renderDemandPreview==='function') renderDemandPreview();
+      return;
+    }catch(err){ console.warn('v1.10.81 addDemandPreview guard failed; falling back', err); return oldAddDemandPreview?oldAddDemandPreview.apply(this,arguments):undefined; }
+  };
+  try{ addDemandPreview=window.addDemandPreview; }catch(e){}
+
+  const oldReadDemandFile=window.readDemandFile;
+  window.readDemandFile=async function(){
+    if(!oldReadDemandFile) return;
+    const before=(state.demandPreview||[]).length;
+    const res=await oldReadDemandFile.apply(this,arguments);
+    try{ const m=window.mergeDuplicateDemandPreview(true); if(m){ if(typeof save==='function') save(); if(typeof renderDemandPreview==='function') renderDemandPreview(); } }catch(e){}
+    return res;
+  };
+  try{ readDemandFile=window.readDemandFile; }catch(e){}
+
+  const oldRenderDemandPreview=window.renderDemandPreview;
+  window.renderDemandPreview=function(){
+    const res=oldRenderDemandPreview?oldRenderDemandPreview.apply(this,arguments):undefined;
+    try{
+      const table=document.getElementById('demandPreviewTable');
+      if(table && (state.demandPreview||[]).some(d=>n(d.mergedCount)>1)){
+        [...table.querySelectorAll('tr')].slice(1).forEach((tr,i)=>{
+          const d=(state.demandPreview||[])[i];
+          if(d && n(d.mergedCount)>1){
+            const cell=tr.children[6];
+            if(cell) cell.innerHTML += `<div class="mini muted">Merged ${n(d.mergedCount)} demand lines into one slab request.</div>`;
+          }
+        });
+      }
+    }catch(e){}
+    return res;
+  };
+  try{ renderDemandPreview=window.renderDemandPreview; }catch(e){}
+
+  const oldCreateReleaseProposals=window.createReleaseProposals;
+  window.createReleaseProposals=function(){
+    try{ window.mergeDuplicateDemandPreview(false); }catch(e){}
+    const res=oldCreateReleaseProposals?oldCreateReleaseProposals.apply(this,arguments):undefined;
+    try{ window.consolidateDuplicateReleaseQueue(false); if(typeof save==='function') save(); if(typeof renderAll==='function') renderAll(); }catch(e){}
+    return res;
+  };
+  try{ createReleaseProposals=window.createReleaseProposals; }catch(e){}
+
+  const oldConfirmSelectedShipments=window.confirmSelectedShipments;
+  window.confirmSelectedShipments=function(){ try{ window.consolidateDuplicateReleaseQueue(true); if(typeof renderAll==='function') renderAll(); }catch(e){} return oldConfirmSelectedShipments?oldConfirmSelectedShipments.apply(this,arguments):undefined; };
+  try{ confirmSelectedShipments=window.confirmSelectedShipments; }catch(e){}
+
+  const oldConfirmSelectedDeliveries=window.confirmSelectedDeliveries;
+  window.confirmSelectedDeliveries=function(){ try{ window.consolidateDuplicateReleaseQueue(true); if(typeof renderAll==='function') renderAll(); }catch(e){} return oldConfirmSelectedDeliveries?oldConfirmSelectedDeliveries.apply(this,arguments):undefined; };
+  try{ confirmSelectedDeliveries=window.confirmSelectedDeliveries; }catch(e){}
+
+  const oldConfirmDelivery=window.confirmDelivery;
+  window.confirmDelivery=function(i,rerender=true){
+    try{ window.consolidateDuplicateReleaseQueue(false); }catch(e){}
+    const r=state.releaseQueue&&state.releaseQueue[i];
+    if(r){
+      const already=n(r.woGeneratedQty), shipped=n(r.shippedQty), delivered=n(r.deliveredQty);
+      if(already>=shipped && shipped>0){ alert('Work orders were already generated for the shipped quantity of this slab request. Duplicate generation is blocked.'); return false; }
+    }
+    return oldConfirmDelivery?oldConfirmDelivery.apply(this,arguments):false;
+  };
+  try{ confirmDelivery=window.confirmDelivery; }catch(e){}
+
+  // Runtime cleanup for old saved data after login/load.
+  const oldRenderAll=window.renderAll;
+  if(oldRenderAll){
+    window.renderAll=function(){ try{ window.consolidateDuplicateReleaseQueue(false); }catch(e){} return oldRenderAll.apply(this,arguments); };
+    try{ renderAll=window.renderAll; }catch(e){}
+  }
+  try{ window.mergeDuplicateDemandPreview(false); window.consolidateDuplicateReleaseQueue(false); }catch(e){}
+})();
 </script>
 
+
+<script>
+/* ============================================================
+   v1.10.81 - Cancel whole pod order across all generated activities
+   - Admin/Supervisor can cancel one pod/order line from Order Management.
+   - Cancellation applies to all open activity lines with same Batch + Project + Pod Type.
+   - Cancelled lines are removed from operator ready/blocked cards and excluded from open backlog.
+   ============================================================ */
+(function(){
+  try{ if(typeof APP_VERSION!=='undefined') APP_VERSION='v1.10.81'; }catch(e){}
+  const n=v=>Number(v||0)||0;
+  const esc=s=>(typeof htmlEscape==='function'?htmlEscape(String(s??'')):String(s??''));
+  const attr=s=>(typeof jsAttr==='function'?jsAttr(String(s??'')):String(s??'').replace(/'/g,"\\'"));
+  function isCancelledLine(l){ return /cancel/i.test(String((l&&l.status)||'')) || !!(l&&l.cancelledAt); }
+  function cancelUser(){ return (typeof correctionUserName==='function'?correctionUserName():(currentUser&&currentUser.user)||'User'); }
+  function canCancelPodOrder(){ return !!(currentUser && ['admin','supervisor'].includes(currentUser.role)); }
+  window.canCancelPodOrder=canCancelPodOrder;
+
+  // Keep cancelled lines truly closed when existing normalization runs.
+  const oldEnsure=window.ensureWOLines;
+  window.ensureWOLines=function(w){
+    let lines=oldEnsure?oldEnsure.apply(this,arguments):(w&&w.lines)||[];
+    try{
+      (lines||[]).forEach(l=>{
+        if(isCancelledLine(l)){
+          l.status='Cancelled';
+          l.remainingQty=0;
+          l.holdReason='';
+        }
+      });
+    }catch(e){}
+    return lines;
+  };
+  try{ ensureWOLines=window.ensureWOLines; }catch(e){}
+
+  const oldDisplay=window.displayLineStatus;
+  window.displayLineStatus=function(w,l){
+    if(isCancelledLine(l)) return 'Cancelled';
+    return oldDisplay?oldDisplay.apply(this,arguments):(l&&l.status)||'Ready';
+  };
+  try{ displayLineStatus=window.displayLineStatus; }catch(e){}
+
+  const oldDep=window.dependencyInfo;
+  window.dependencyInfo=function(w,l){
+    if(isCancelledLine(l)) return {deps:[],allowed:0,blocked:0,waitingFor:'Cancelled',depLimit:0};
+    return oldDep?oldDep.apply(this,arguments):{deps:[],allowed:n(l&&l.remainingQty),blocked:0,waitingFor:'None',depLimit:n(l&&l.requiredQty)};
+  };
+  try{ dependencyInfo=window.dependencyInfo; }catch(e){}
+
+  const oldUpdateHeader=window.updateWOHeader;
+  window.updateWOHeader=function(w){
+    const res=oldUpdateHeader?oldUpdateHeader.apply(this,arguments):undefined;
+    try{
+      const lines=(typeof ensureWOLines==='function'?ensureWOLines(w):(w.lines||[]));
+      if(lines.length && lines.every(isCancelledLine)){
+        w.status='Cancelled';
+        w.remainingQty=0;
+        w.cancelledAt=w.cancelledAt||lines.map(l=>l.cancelledAt).filter(Boolean).sort().pop();
+      }else if(lines.some(isCancelledLine) && !lines.some(l=>!isCancelledLine(l) && n(l.remainingQty)>0)){
+        // mixed completed + cancelled only: the WO is closed, not open.
+        w.status=lines.some(l=>!isCancelledLine(l) && n(l.completedQty)>0)?'Completed':'Cancelled';
+        w.remainingQty=0;
+      }
+    }catch(e){}
+    return res;
+  };
+  try{ updateWOHeader=window.updateWOHeader; }catch(e){}
+
+  // Exclude cancelled lines from station/open-line helper outputs.
+  const oldAllLines=window.allWOLines;
+  if(oldAllLines){
+    window.allWOLines=function(){
+      return (oldAllLines.apply(this,arguments)||[]).map(r=>{
+        if(/cancel/i.test(String(r.lineStatus||r.status||''))){ r.remainingQty=0; r.lineStatus='Cancelled'; r.status='Cancelled'; }
+        return r;
+      }).filter(r=>!String(r.lineStatus||r.status||'').match(/cancel/i));
+    };
+    try{ allWOLines=window.allWOLines; }catch(e){}
+  }
+
+  function matchingPodLines(batch,project,pod){
+    const out=[];
+    (state.workOrders||[]).forEach(w=>{
+      (typeof ensureWOLines==='function'?ensureWOLines(w):(w.lines||[])).forEach(l=>{
+        if(String(w.batch||'')===String(batch||'') && String(l.project||'')===String(project||'') && String(l.pod||'')===String(pod||'')) out.push({w,l});
+      });
+    });
+    return out;
+  }
+  window.matchingPodLinesForCancel=matchingPodLines;
+
+  window.cancelPodOrderFromOrderManagement=function(rowId){
+    if(!canCancelPodOrder()) return (typeof showDenied==='function'?showDenied('Only Admin or Production Supervisor can cancel a pod order.'):alert('Only Admin or Production Supervisor can cancel a pod order.'));
+    const found=(typeof findOrderLineByRowId==='function')?findOrderLineByRowId(rowId):null;
+    if(!found||!found.w||!found.l) return alert('Order line not found. Refresh and try again.');
+    const w=found.w, l=found.l;
+    const batch=w.batch||'', project=l.project||'', pod=l.pod||'';
+    const matches=matchingPodLines(batch,project,pod);
+    const open=matches.filter(x=>!isCancelledLine(x.l) && n(x.l.remainingQty)>0);
+    if(!open.length) return alert('No open activity quantities found to cancel for this pod order.');
+    const completed=matches.filter(x=>n(x.l.completedQty)>0).length;
+    const reason=prompt(`Cancel this pod order across all generated activities?\n\nBatch: ${batch}\nProject / Pod Type: ${project} / ${pod}\nOpen activity lines to close: ${open.length}\nCompleted activity lines found: ${completed}\n\nEnter cancellation reason:`);
+    if(!reason || !String(reason).trim()) return alert('Cancellation cancelled. Reason is required.');
+    const user=cancelUser(), ts=(typeof nowISO==='function'?nowISO():new Date().toISOString());
+    let affected=0, cancelledQty=0, activityList=[];
+    open.forEach(({w,l})=>{
+      const oldRemain=n(l.remainingQty), oldStatus=l.status||'';
+      l.cancelledQty=(n(l.cancelledQty)+oldRemain);
+      l.remainingQty=0;
+      l.status='Cancelled';
+      l.cancelledAt=ts;
+      l.cancelledBy=user;
+      l.cancelReason=String(reason).trim();
+      l.holdReason='';
+      if(!l.remarks) l.remarks='';
+      l.remarks=[l.remarks, 'Cancelled: '+String(reason).trim()].filter(Boolean).join(' | ');
+      affected++; cancelledQty+=oldRemain; activityList.push(w.activity||w.activityCode||'Activity');
+      try{
+        if(typeof logWorkOrderCorrection==='function') logWorkOrderCorrection({
+          type:'Pod Order Cancel',batch:w.batch,wo:w.wo,activity:w.activity,workstation:w.workstation,project:l.project,pod:l.pod,
+          field:'Status / Remaining Qty',oldValue:`Status ${oldStatus||'-'}, Remaining ${oldRemain}`,newValue:'Status Cancelled, Remaining 0',reason:String(reason).trim()
+        });
+      }catch(e){}
+    });
+    matches.forEach(({w})=>{ try{ if(typeof updateWOHeader==='function') updateWOHeader(w); }catch(e){} });
+    // Also mark related release request as cancelled for this batch/project/pod only, when not already closed/generated for another quantity.
+    try{
+      (state.releaseQueue||[]).filter(r=>String(r.batch||'')===String(batch)&&String(r.project||'')===String(project)&&String(r.pod||'')===String(pod)).forEach(r=>{
+        r.cancelledAt=ts; r.cancelledBy=user; r.cancelReason=String(reason).trim();
+        if(!/WO Generated|Delivered|Shipped/i.test(String(r.status||'')) || affected>0) r.status='Cancelled - Work Order';
+      });
+    }catch(e){}
+    try{ if(typeof addEvent==='function') addEvent(`Pod order cancelled: ${batch} ${project}/${pod}. ${affected} activity lines closed, qty ${cancelledQty}.`); }catch(e){}
+    try{ if(typeof save==='function') save(); }catch(e){}
+    try{ if(typeof renderAll==='function') renderAll(); else if(typeof renderOrderManagement==='function') renderOrderManagement(); }catch(e){}
+    alert(`Cancelled pod order for ${project} / ${pod}.\nClosed activity lines: ${affected}\nCancelled remaining qty: ${cancelledQty}`);
+  };
+
+  const oldOrderRows=window.orderManagementRows;
+  if(oldOrderRows){
+    window.orderManagementRows=function(){
+      return (oldOrderRows.apply(this,arguments)||[]).map(r=>{
+        try{
+          const found=(typeof findOrderLineByRowId==='function')?findOrderLineByRowId(r.rowId):null;
+          if(found && isCancelledLine(found.l)){ r.status='Cancelled'; r.remainingQty=0; r.cancelledAt=found.l.cancelledAt||''; }
+        }catch(e){}
+        return r;
+      });
+    };
+    try{ orderManagementRows=window.orderManagementRows; }catch(e){}
+  }
+
+  const oldRenderOM=window.renderOrderManagement;
+  if(oldRenderOM){
+    window.renderOrderManagement=function(){
+      const res=oldRenderOM.apply(this,arguments);
+      try{
+        const el=document.getElementById('orderMgmtTable');
+        if(!el || !canCancelPodOrder()) return res;
+        // Replace Action cell buttons with Edit/Correct + Cancel Pod Order where applicable.
+        const rows=(typeof filteredOrderManagementRows==='function'?filteredOrderManagementRows():[]);
+        const trs=[...el.querySelectorAll('tr')].slice(1);
+        trs.forEach((tr,i)=>{
+          const r=rows[i]; if(!r) return;
+          const cell=tr.cells[tr.cells.length-1]; if(!cell) return;
+          const isCancelled=/cancel/i.test(String(r.status||''));
+          const canCancel=!isCancelled && Number(r.remainingQty||0)>0;
+          cell.innerHTML=`<div class="actions" style="gap:6px;flex-wrap:wrap"><button class="btn grey" onclick="openOrderEditModal('${attr(r.rowId)}')">Edit / Correct</button>${canCancel?`<button class="btn bad" onclick="cancelPodOrderFromOrderManagement('${attr(r.rowId)}')">Cancel Pod Order</button>`:''}</div>`;
+        });
+      }catch(e){ console.warn('Cancel Pod Order action render failed', e); }
+      return res;
+    };
+    try{ renderOrderManagement=window.renderOrderManagement; }catch(e){}
+  }
+
+  // Keep operator workstation clean: cancelled lines should not appear as actionable cards.
+  const oldLineMatch=window.lineMatchesFilters;
+  if(oldLineMatch){
+    window.lineMatchesFilters=function(w,l,filters){
+      if(isCancelledLine(l)) return false;
+      return oldLineMatch.apply(this,arguments);
+    };
+    try{ lineMatchesFilters=window.lineMatchesFilters; }catch(e){}
+  }
+
+  // Runtime cleanup / recalc for already cancelled rows after loading.
+  try{ (state.workOrders||[]).forEach(w=>{ (w.lines||[]).forEach(l=>{ if(isCancelledLine(l)){ l.status='Cancelled'; l.remainingQty=0; } }); if(typeof updateWOHeader==='function') updateWOHeader(w); }); }catch(e){}
+})();
+</script>
+
+
+
+<script>
+/* ============================================================
+   v1.10.82 - Daily Demand duplicate confirmation
+   - Duplicate manual demand entry now asks OK/Cancel before merging.
+   - OK merges the qty into the existing Date + Project + Pod Type line.
+   - Cancel keeps the existing preview unchanged and does not add/merge the duplicate.
+   ============================================================ */
+(function(){
+  try{ if(typeof APP_VERSION!=='undefined') APP_VERSION='v1.10.82'; }catch(e){}
+  try{ window.__DUPOD_APP_VERSION__='v1.10.82'; }catch(e){}
+  const n=v=>Number(v||0)||0;
+  const clean=v=>String(v||'').trim();
+  function key(x){ return [clean(x&&x.date), clean(x&&x.project).toUpperCase(), clean(x&&x.pod).toUpperCase()].join('|'); }
+  function mergeNote(a,b){ a=clean(a); b=clean(b); if(!a)return b; if(!b||a===b)return a; return a+' | '+b; }
+  function combineLocation(a,b){ a=clean(a); b=clean(b); if(!a)return b; if(!b||a===b)return a; return 'Multiple'; }
+  function mergeIntoExisting(existing,d){
+    existing.qty=n(existing.qty)+n(d.qty);
+    existing.priority=Math.min(n(existing.priority)||1,n(d.priority)||1);
+    existing.building=combineLocation(existing.building,d.building);
+    existing.level=combineLocation(existing.level,d.level);
+    existing.remarks=mergeNote(existing.remarks,d.remarks||'Merged duplicate demand line');
+    existing.mergedCount=n(existing.mergedCount||1)+1;
+  }
+  window.addDemandPreview=function(){
+    try{
+      const p=clean(document.getElementById('demProject')?.value);
+      const pod=clean(document.getElementById('demPod')?.value);
+      const qty=n(document.getElementById('demQty')?.value);
+      const d={
+        id:(crypto&&crypto.randomUUID)?crypto.randomUUID():String(Date.now()),
+        date:document.getElementById('demDate')?.value||today(),
+        project:p,
+        pod:pod,
+        qty:qty,
+        priority:n(document.getElementById('demPriority')?.value)||1,
+        building:clean(document.getElementById('demBuilding')?.value),
+        level:clean(document.getElementById('demLevel')?.value),
+        remarks:document.getElementById('demRemarks')?.value||''
+      };
+      if(!p||!pod||qty<=0) return alert('Add valid demand.');
+      if(typeof isProjectPodActive==='function' && !isProjectPodActive(p,pod)) return alert('Cannot add demand. This Project + Pod Type is inactive or missing from the master.');
+      state.demandPreview=state.demandPreview||[];
+      const existing=state.demandPreview.find(x=>key(x)===key(d));
+      if(existing){
+        const oldQty=n(existing.qty);
+        const newQty=oldQty+n(d.qty);
+        const msg=`Duplicate slab request detected for ${p} / ${pod} on ${d.date}.\n\nExisting qty: ${oldQty}\nNew qty to add: ${n(d.qty)}\nTotal after merge: ${newQty}\n\nPress OK to merge with the existing line.\nPress Cancel to keep the existing line unchanged.`;
+        if(!confirm(msg)){
+          return false;
+        }
+        mergeIntoExisting(existing,d);
+      }else{
+        state.demandPreview.push(d);
+      }
+      if(typeof save==='function') save();
+      if(typeof renderDemandPreview==='function') renderDemandPreview();
+      return true;
+    }catch(err){ console.warn('v1.10.82 duplicate demand confirmation failed',err); alert('Unable to add demand line. Please refresh and try again.'); return false; }
+  };
+  try{ addDemandPreview=window.addDemandPreview; }catch(e){}
+  try{ const footer=document.querySelector('.footer'); if(footer) footer.textContent='DuPod Production Control System v1.10.82'; }catch(e){}
+})();
+</script>
 </body>
 </html>
 
-<!-- v1.10.79: Ready for Main Assembly cards only; Subassembly Release History renamed. Operator workstation filter cleanup and dependency optimization retained. -->
+<!-- v1.10.81: Ready for Main Assembly cards only; Subassembly Release History renamed. Operator workstation filter cleanup and dependency optimization retained. -->
