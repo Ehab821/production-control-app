@@ -6,7 +6,7 @@
 <meta http-equiv="Expires" content="0">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>DuPod Production Control System v1.10.87</title>
+  <title>DuPod Production Control System v1.10.88</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js">
 
 /* ============================================================
@@ -1061,7 +1061,7 @@
       </div>
     </div>
   </section>
-</main><div class="footer">DuPod Production Control System v1.10.87</div>
+</main><div class="footer">DuPod Production Control System v1.10.88</div>
 
 
   <section id="stationreport" class="section">
@@ -8641,7 +8641,7 @@ try{ if(typeof submitCompleteQtyModal==='function') window.submitCompleteQtyModa
     }catch(err){ console.warn('v1.10.83 duplicate demand confirmation failed',err); alert('Unable to add demand line. Please refresh and try again.'); return false; }
   };
   try{ addDemandPreview=window.addDemandPreview; }catch(e){}
-  try{ const footer=document.querySelector('.footer'); if(footer) footer.textContent='DuPod Production Control System v1.10.87'; }catch(e){}
+  try{ const footer=document.querySelector('.footer'); if(footer) footer.textContent='DuPod Production Control System v1.10.88'; }catch(e){}
 })();
 </script>
 
@@ -8831,7 +8831,7 @@ try{ if(typeof submitCompleteQtyModal==='function') window.submitCompleteQtyModa
   const style=document.createElement('style');
   style.textContent=`.readySearchRow{margin-top:12px}.readySearchRow input,.stationStockTools input{min-width:260px;flex:1}.stationStockTools{display:flex;gap:8px;align-items:center;margin:0 0 12px 0;flex-wrap:wrap}.subassemblyReleaseFilterRow{align-items:center}`;
   document.head.appendChild(style);
-  try{ const footer=document.querySelector('.footer'); if(footer) footer.textContent='DuPod Production Control System v1.10.87'; }catch(e){}
+  try{ const footer=document.querySelector('.footer'); if(footer) footer.textContent='DuPod Production Control System v1.10.88'; }catch(e){}
   try{ setTimeout(()=>{try{renderReady();renderMainAssemblyReleaseHistory();renderStationStockTab();}catch(e){}},0); }catch(e){}
 })();
 </script>
@@ -8839,13 +8839,13 @@ try{ if(typeof submitCompleteQtyModal==='function') window.submitCompleteQtyModa
 
 <script>
 /* ============================================================
-   v1.10.87 - Export filter fixes
+   v1.10.88 - Export filter fixes
    - Subassembly Release History export now uses the same filtered/sorted history data shown on screen.
    - Station Stock export now exports only the currently visible/filtered rows.
    ============================================================ */
 (function(){
-  try{ if(typeof APP_VERSION!=='undefined') APP_VERSION='v1.10.87'; }catch(e){}
-  try{ window.__DUPOD_APP_VERSION__='v1.10.87'; }catch(e){}
+  try{ if(typeof APP_VERSION!=='undefined') APP_VERSION='v1.10.88'; }catch(e){}
+  try{ window.__DUPOD_APP_VERSION__='v1.10.88'; }catch(e){}
   const n=v=>Number(v||0)||0;
   const esc=v=>typeof htmlEscape==='function'?htmlEscape(v):String(v??'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
   const low=v=>String(v||'').toLowerCase();
@@ -8991,7 +8991,7 @@ try{ if(typeof submitCompleteQtyModal==='function') window.submitCompleteQtyModa
       doc.save('DuPod_Station_Stock_Filtered_'+stamp()+'.pdf');
     }catch(e){ alert('Station Stock PDF export failed: '+e.message); }
   };
-  try{ const footer=document.querySelector('.footer'); if(footer) footer.textContent='DuPod Production Control System v1.10.87'; }catch(e){}
+  try{ const footer=document.querySelector('.footer'); if(footer) footer.textContent='DuPod Production Control System v1.10.88'; }catch(e){}
 })();
 </script>
 
@@ -8999,13 +8999,13 @@ try{ if(typeof submitCompleteQtyModal==='function') window.submitCompleteQtyModa
 
 <script>
 /* ============================================================
-   v1.10.87 - Search and filtered export hard fix
+   v1.10.88 - Search and filtered export hard fix
    - Ready for Main Assembly search now filters the actual rendered pod cards.
    - Subassembly Release History export now builds from all release sources and current filters.
    - Station Stock export now uses the same current station/KPI/search/sort filters.
    ============================================================ */
 (function(){
-  const VERSION='v1.10.87';
+  const VERSION='v1.10.88';
   try{ if(typeof APP_VERSION!=='undefined') APP_VERSION=VERSION; }catch(e){}
   try{ window.__DUPOD_APP_VERSION__=VERSION; }catch(e){}
   const norm=v=>String(v==null?'':v).trim();
@@ -9113,7 +9113,7 @@ try{ if(typeof submitCompleteQtyModal==='function') window.submitCompleteQtyModa
   window.exportStationStockExcel=function(){try{if(!window.XLSX)return alert('Excel library is not loaded. Please open with internet connection.'); const rows=stationStockExportRows(); if(!rows.length)return alert('No Station Stock rows match the current filters.'); const wb=XLSX.utils.book_new(), used=new Set(); const head=['Station','Project','Pod Type','Activity','Output Item','Stock Type','Next Station','Ahead Extra','Ready Move','Ready Main','Released to Main Assembly','Consumed by Next Station','Balance','Status']; const summary=[['Metric','Value'],['Filtered Rows',rows.length],['Ahead Extra',rows.reduce((s,r)=>s+n(r.ahead),0)],['Ready Move',rows.reduce((s,r)=>s+n(r.readyMove),0)],['Ready Main',rows.reduce((s,r)=>s+n(r.readyMain),0)],['Released to Main Assembly',rows.reduce((s,r)=>s+n(r.releasedMain),0)],['Consumed by Next Station',rows.reduce((s,r)=>s+n(r.consumed),0)],['Balance',rows.reduce((s,r)=>s+n(r.balance),0)]]; XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(summary),sheetName('Summary',used)); const by={}; rows.forEach(r=>(by[r.station]=by[r.station]||[]).push(r)); Object.keys(by).sort().forEach(st=>{const aoa=[head].concat(by[st].map(r=>[r.station,r.project,r.pod,r.activity,r.output,r.stockType,r.next,r.ahead,r.readyMove,r.readyMain,r.releasedMain,r.consumed,r.balance,r.status])); const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:24},{wch:16},{wch:16},{wch:28},{wch:28},{wch:18},{wch:28},{wch:12},{wch:12},{wch:12},{wch:22},{wch:22},{wch:10},{wch:24}]; XLSX.utils.book_append_sheet(wb,ws,sheetName(st,used));}); XLSX.writeFile(wb,'DuPod_Station_Stock_Filtered_'+stamp()+'.xlsx');}catch(e){alert('Station Stock Excel export failed: '+e.message);}};
   window.exportStationStockPDF=function(){try{const jspdfLib=window.jspdf;if(!jspdfLib||!jspdfLib.jsPDF)return alert('PDF library is not loaded. Please open with internet connection.'); const rows=stationStockExportRows(); if(!rows.length)return alert('No Station Stock rows match the current filters.'); const {jsPDF}=jspdfLib; const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'}); const by={}; rows.forEach(r=>(by[r.station]=by[r.station]||[]).push(r)); Object.keys(by).sort().forEach((st,idx)=>{if(idx)doc.addPage();doc.setFontSize(14);doc.text('DuPod Station Stock - '+st,14,14);doc.setFontSize(8);doc.text('Filtered export • Generated: '+dt(new Date().toISOString()),14,20); const body=by[st].map(r=>[r.project,r.pod,r.activity,r.output,r.stockType,r.next,r.ahead,r.readyMove,r.readyMain,r.releasedMain,r.consumed,r.balance,r.status]); if(doc.autoTable){doc.autoTable({head:[['Project','Pod Type','Activity','Output','Stock Type','Next Station','Ahead','Ready Move','Ready Main','Released Main','Consumed','Balance','Status']],body,startY:27,styles:{fontSize:6.5,cellPadding:1.2},headStyles:{fillColor:[35,32,32]},theme:'grid'});}else doc.text(JSON.stringify(body.slice(0,20)),14,30);}); doc.save('DuPod_Station_Stock_Filtered_'+stamp()+'.pdf');}catch(e){alert('Station Stock PDF export failed: '+e.message);}};
   try{const style=document.createElement('style');style.textContent='.readySearchRow{margin-top:12px}.readySearchRow input{width:100%;min-width:260px}.subassemblyReleaseFilterRow{display:grid!important;grid-template-columns:repeat(4,minmax(150px,1fr));gap:10px;align-items:center}.subassemblyReleaseFilterRow select,.subassemblyReleaseFilterRow input{width:100%;min-width:0}@media(max-width:900px){.subassemblyReleaseFilterRow{grid-template-columns:repeat(2,minmax(150px,1fr))}}@media(max-width:560px){.subassemblyReleaseFilterRow{grid-template-columns:1fr}}';document.head.appendChild(style);}catch(e){}
-  try{ const footer=document.querySelector('.footer'); if(footer) footer.textContent='DuPod Production Control System v1.10.87'; }catch(e){}
+  try{ const footer=document.querySelector('.footer'); if(footer) footer.textContent='DuPod Production Control System v1.10.88'; }catch(e){}
   try{ setTimeout(()=>{try{ if(document.getElementById('ready')?.classList.contains('active')) renderReady(); if(document.getElementById('mainAssemblyReleaseHistory')) renderMainAssemblyReleaseHistory(); }catch(e){}},0); }catch(e){}
 })();
 </script>
@@ -9122,12 +9122,12 @@ try{ if(typeof submitCompleteQtyModal==='function') window.submitCompleteQtyModa
 
 <script>
 /* ============================================================
-   v1.10.87 - Ready search focus + Station Stock filter/export hard sync
+   v1.10.88 - Ready search focus + Station Stock filter/export hard sync
    - Ready for Main Assembly search filters cards without re-rendering the search box.
    - Station Stock screen and export now use the same station/KPI/search/sort filter state.
    ============================================================ */
 (function(){
-  const VERSION='v1.10.87';
+  const VERSION='v1.10.88';
   try{ if(typeof APP_VERSION!=='undefined') APP_VERSION=VERSION; }catch(e){}
   try{ window.__DUPOD_APP_VERSION__=VERSION; }catch(e){}
   const n=v=>Number(v||0)||0;
@@ -9259,20 +9259,20 @@ try{ if(typeof submitCompleteQtyModal==='function') window.submitCompleteQtyModa
   window.exportStationStockExcel=function(){try{if(!window.XLSX)return alert('Excel library is not loaded. Please open with internet connection.'); const rows=stationStockExportRows86(); if(!rows.length)return alert('No Station Stock rows match the current filters.'); const wb=XLSX.utils.book_new(), used=new Set(); const head=['Station','Project','Pod Type','Activity','Output Item','Stock Type','Next Station','Ahead Extra','Ready Move','Ready Main','Released to Main Assembly','Consumed by Next Station','Balance','Status']; const summary=[['Metric','Value'],['Filtered Rows',rows.length],['Ahead Extra',rows.reduce((s,r)=>s+n(r.ahead),0)],['Ready Move',rows.reduce((s,r)=>s+n(r.readyMove),0)],['Ready Main',rows.reduce((s,r)=>s+n(r.readyMain),0)],['Released to Main Assembly',rows.reduce((s,r)=>s+n(r.releasedMain),0)],['Consumed by Next Station',rows.reduce((s,r)=>s+n(r.consumed),0)],['Balance',rows.reduce((s,r)=>s+n(r.balance),0)]]; XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(summary),sheetName('Summary',used)); const by={}; rows.forEach(r=>(by[r.station]=by[r.station]||[]).push(r)); Object.keys(by).sort().forEach(st=>{const aoa=[head].concat(by[st].map(r=>[r.station,r.project,r.pod,r.activity,r.output,r.stockType,r.next,r.ahead,r.readyMove,r.readyMain,r.releasedMain,r.consumed,r.balance,r.status])); const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:24},{wch:16},{wch:16},{wch:28},{wch:28},{wch:18},{wch:28},{wch:12},{wch:12},{wch:12},{wch:22},{wch:22},{wch:10},{wch:24}]; XLSX.utils.book_append_sheet(wb,ws,sheetName(st,used));}); XLSX.writeFile(wb,'DuPod_Station_Stock_Filtered_'+stamp()+'.xlsx');}catch(e){alert('Station Stock Excel export failed: '+e.message);}};
   window.exportStationStockPDF=function(){try{const jspdfLib=window.jspdf;if(!jspdfLib||!jspdfLib.jsPDF)return alert('PDF library is not loaded. Please open with internet connection.'); const rows=stationStockExportRows86(); if(!rows.length)return alert('No Station Stock rows match the current filters.'); const {jsPDF}=jspdfLib; const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'}); const by={}; rows.forEach(r=>(by[r.station]=by[r.station]||[]).push(r)); Object.keys(by).sort().forEach((st,idx)=>{if(idx)doc.addPage();doc.setFontSize(14);doc.text('DuPod Station Stock - '+st,14,14);doc.setFontSize(8);doc.text('Filtered export • Generated: '+dt(new Date().toISOString()),14,20); const body=by[st].map(r=>[r.project,r.pod,r.activity,r.output,r.stockType,r.next,r.ahead,r.readyMove,r.readyMain,r.releasedMain,r.consumed,r.balance,r.status]); if(doc.autoTable){doc.autoTable({head:[['Project','Pod Type','Activity','Output','Stock Type','Next Station','Ahead','Ready Move','Ready Main','Released Main','Consumed','Balance','Status']],body,startY:27,styles:{fontSize:6.5,cellPadding:1.2},headStyles:{fillColor:[35,32,32]},theme:'grid'});}else doc.text(JSON.stringify(body.slice(0,20)),14,30);}); doc.save('DuPod_Station_Stock_Filtered_'+stamp()+'.pdf');}catch(e){alert('Station Stock PDF export failed: '+e.message);}};
   try{ const style=document.createElement('style'); style.textContent='.readySearchRow input{width:100%;min-width:260px}.stationStockTools{display:flex;gap:8px;align-items:center;margin:0 0 12px 0;flex-wrap:wrap}.stationStockTools input{min-width:260px;flex:1}'; document.head.appendChild(style); }catch(e){}
-  try{ const footer=document.querySelector('.footer'); if(footer) footer.textContent='DuPod Production Control System v1.10.87'; }catch(e){}
+  try{ const footer=document.querySelector('.footer'); if(footer) footer.textContent='DuPod Production Control System v1.10.88'; }catch(e){}
 })();
 </script>
 
 
 <script>
 /* ============================================================
-   v1.10.87 - Slab Release & Delivery selection fix
+   v1.10.88 - Slab Release & Delivery selection fix
    - Fixes Casting Team "Select at least one shipment line" after selecting a line.
    - Prevents pre-confirmation rerender from clearing selected checkboxes.
    - Applies same stable selection handling to Delivery + WO generation.
    ============================================================ */
 (function(){
-  try{ if(typeof APP_VERSION!=='undefined') APP_VERSION='v1.10.87'; }catch(e){}
+  try{ if(typeof APP_VERSION!=='undefined') APP_VERSION='v1.10.88'; }catch(e){}
   function selectedReleaseIndices(selector){
     try{
       return Array.from(document.querySelectorAll(selector+':checked'))
@@ -9321,9 +9321,152 @@ try{ if(typeof submitCompleteQtyModal==='function') window.submitCompleteQtyModa
   // This final override intentionally supersedes earlier duplicate-guard wrappers that re-rendered before reading checkbox selection.
   try{
     const footer=document.querySelector('.footer');
-    if(footer) footer.textContent='DuPod Production Control System v1.10.87';
-    document.title='DuPod Production Control System v1.10.87';
+    if(footer) footer.textContent='DuPod Production Control System v1.10.88';
+    document.title='DuPod Production Control System v1.10.88';
   }catch(e){}
+})();
+</script>
+
+
+<script>
+/* ============================================================
+   v1.10.88 - Slab delivery + WO generation robust processing
+   - Captures selected delivery/shipment rows before any refresh.
+   - Processes delivery by release line ID/object instead of fragile row index.
+   - Prevents earlier duplicate-consolidation wrappers from shifting selected indices.
+   - Generates work orders only for the qty confirmed in the current delivery action.
+   ============================================================ */
+(function(){
+  try{ if(typeof APP_VERSION!=='undefined') APP_VERSION='v1.10.88'; }catch(e){}
+  const n=v=>Number(v||0)||0;
+  function uid(){ try{return crypto.randomUUID();}catch(e){return 'id_'+Date.now()+'_'+Math.random().toString(16).slice(2);} }
+  function getRelByIdOrIndex(id,idx){
+    try{
+      const q=state.releaseQueue||[];
+      let r=id ? q.find(x=>String(x.id||'')===String(id)) : null;
+      if(r) return r;
+      return q[idx]||null;
+    }catch(e){ return null; }
+  }
+  function readSelectedReleaseRows(selector,prefix){
+    const out=[];
+    try{
+      Array.from(document.querySelectorAll(selector+':checked')).forEach(cb=>{
+        const idx=Number(cb.getAttribute('data-index'));
+        const r=getRelByIdOrIndex(cb.getAttribute('data-release-id'),idx);
+        if(!r) return;
+        const qtyEl=document.getElementById(prefix+'_'+idx);
+        const remEl=document.getElementById(prefix+'Rem_'+idx);
+        out.push({id:r.id,index:idx,ref:r,qty:n(qtyEl&&qtyEl.value),remarks:String((remEl&&remEl.value)||'')});
+      });
+    }catch(e){ console.warn('Selected release row read failed', e); }
+    return out;
+  }
+  const oldRenderShipmentTable=window.renderShipmentTable;
+  window.renderShipmentTable=function(){
+    const res=oldRenderShipmentTable?oldRenderShipmentTable.apply(this,arguments):undefined;
+    try{ Array.from(document.querySelectorAll('.shipSelect')).forEach(cb=>{ const r=(state.releaseQueue||[])[Number(cb.dataset.index)]; if(r) cb.setAttribute('data-release-id',r.id||''); }); }catch(e){}
+    return res;
+  };
+  try{ renderShipmentTable=window.renderShipmentTable; }catch(e){}
+  const oldRenderDeliveryTable=window.renderDeliveryTable;
+  window.renderDeliveryTable=function(){
+    const res=oldRenderDeliveryTable?oldRenderDeliveryTable.apply(this,arguments):undefined;
+    try{ Array.from(document.querySelectorAll('.deliverySelect')).forEach(cb=>{ const r=(state.releaseQueue||[])[Number(cb.dataset.index)]; if(r) cb.setAttribute('data-release-id',r.id||''); }); }catch(e){}
+    return res;
+  };
+  try{ renderDeliveryTable=window.renderDeliveryTable; }catch(e){}
+
+  function confirmShipmentCaptured(item){
+    const r=getRelByIdOrIndex(item.id,item.index)||item.ref;
+    if(!r) return false;
+    try{ if(typeof normalizeRelease==='function') normalizeRelease(r); }catch(e){}
+    if(typeof roleCanShip==='function' && !roleCanShip()){ showDenied('Only Casting Team or Admin can confirm shipment.'); return false; }
+    const remainingShip=Math.max(0,n(r.releaseQty)-n(r.shippedQty));
+    const stock=(typeof getStock==='function')?n(getStock(r.project,r.pod)):Number.MAX_SAFE_INTEGER;
+    const maxShip=Math.min(remainingShip,stock);
+    const qty=n(item.qty);
+    if(qty<=0){ alert('Enter shipment qty greater than zero.'); return false; }
+    if(qty>maxShip){ alert(`Shipment qty cannot exceed available/remaining qty (${maxShip}).`); return false; }
+    r.shippedQty=n(r.shippedQty)+qty;
+    r.shippedBy=(currentUser&&currentUser.user)||'casting';
+    r.shippedAt=(typeof nowISO==='function'?nowISO():new Date().toISOString());
+    r.shipmentRemarks=item.remarks||'';
+    r.status=(n(r.shippedQty)>=n(r.releaseQty))?'Pending Delivery':'Partially Shipped';
+    try{ state.transactions.unshift({id:uid(),date:(typeof today==='function'?today():new Date().toISOString().slice(0,10)),project:r.project,pod:r.pod,qty:-qty,type:'OUT',purpose:'Shipment to Subassembly',ref:r.batch,remarks:item.remarks||'Slab shipment confirmed by casting team',source:'SLAB_SHIPMENT'}); }catch(e){}
+    try{ if(typeof addEvent==='function') addEvent(`Shipment confirmed: ${qty} slab(s) for ${r.project}/${r.pod} (${r.batch}).`); }catch(e){}
+    return true;
+  }
+
+  function confirmDeliveryCaptured(item){
+    const r=getRelByIdOrIndex(item.id,item.index)||item.ref;
+    if(!r) return false;
+    try{ if(typeof normalizeRelease==='function') normalizeRelease(r); }catch(e){}
+    if(typeof roleCanDeliver==='function' && !roleCanDeliver()){ showDenied('Only Production Supervisor or Admin can confirm delivery.'); return false; }
+    const remainingDeliver=Math.max(0,n(r.shippedQty)-n(r.deliveredQty));
+    const qty=n(item.qty);
+    if(qty<=0){ alert('Enter delivery qty greater than zero.'); return false; }
+    if(qty>remainingDeliver){ alert(`Delivery qty cannot exceed shipped-not-delivered qty (${remainingDeliver}).`); return false; }
+    // Generate only the current delivery qty. This avoids duplicate generation for previous delivered qty.
+    r.deliveredQty=n(r.deliveredQty)+qty;
+    r.receivedBy=(currentUser&&currentUser.user)||'supervisor';
+    r.receivedAt=(typeof nowISO==='function'?nowISO():new Date().toISOString());
+    r.deliveryRemarks=item.remarks||'';
+    r.woGeneratedQty=n(r.woGeneratedQty)+qty;
+    const deliveryRelease={...r,id:String(r.id||uid())+'-DEL-'+Date.now()+'-'+Math.random().toString(16).slice(2),releaseQty:qty,deliveredEventQty:qty};
+    if(typeof generateGroupedWOs==='function') generateGroupedWOs([deliveryRelease]);
+    const stillInTransit=Math.max(0,n(r.shippedQty)-n(r.deliveredQty));
+    const notFullyShipped=Math.max(0,n(r.releaseQty)-n(r.shippedQty));
+    if(stillInTransit>0){ r.status='Partially Delivered'; }
+    else if(notFullyShipped>0){
+      try{ if(typeof recordReleaseIssue==='function') recordReleaseIssue(r,'Requested Qty Not Fully Shipped',notFullyShipped,item.remarks||'Shipment was less than requested. Supervisor will consider difference in next demand.'); }catch(e){}
+      r.status='Closed - Partial Delivered';
+    } else { r.status='WO Generated'; }
+    try{ if(typeof addEvent==='function') addEvent(`Delivery confirmed and WOs generated: ${qty} slab(s) for ${r.project}/${r.pod} (${r.batch}).`); }catch(e){}
+    return true;
+  }
+
+  window.confirmSelectedShipments=function(){
+    try{
+      if(typeof roleCanShip==='function' && !roleCanShip()) return showDenied('Only Casting Team or Admin can confirm shipment.');
+      const selected=readSelectedReleaseRows('.shipSelect','ship');
+      if(!selected.length) return alert('Select at least one shipment line.');
+      let done=0;
+      selected.forEach(x=>{ try{ if(confirmShipmentCaptured(x)) done++; }catch(e){ console.warn('Shipment confirm captured failed',e); } });
+      if(done && typeof addEvent==='function') addEvent(`Shipment confirmation completed for ${done} selected line(s).`);
+      try{ if(typeof consolidateDuplicateReleaseQueue==='function') consolidateDuplicateReleaseQueue(false); }catch(e){}
+      try{ if(typeof save==='function') save(); }catch(e){}
+      try{ if(typeof renderAll==='function') renderAll(); }catch(e){}
+    }catch(err){ alert('Shipment confirmation failed: '+(err&&err.message?err.message:err)); }
+  };
+  try{ confirmSelectedShipments=window.confirmSelectedShipments; }catch(e){}
+
+  window.confirmSelectedDeliveries=function(){
+    try{
+      if(typeof roleCanDeliver==='function' && !roleCanDeliver()) return showDenied('Only Production Supervisor or Admin can confirm delivery.');
+      const selected=readSelectedReleaseRows('.deliverySelect','deliv');
+      if(!selected.length) return alert('Select at least one delivery line.');
+      let done=0;
+      selected.forEach(x=>{ try{ if(confirmDeliveryCaptured(x)) done++; }catch(e){ console.warn('Delivery confirm captured failed',e); } });
+      if(done && typeof addEvent==='function') addEvent(`Delivery confirmation and WO generation completed for ${done} selected line(s).`);
+      try{ if(typeof consolidateDuplicateReleaseQueue==='function') consolidateDuplicateReleaseQueue(false); }catch(e){}
+      try{ if(typeof save==='function') save(); }catch(e){}
+      try{ if(typeof renderAll==='function') renderAll(); }catch(e){}
+    }catch(err){ alert('Delivery confirmation failed: '+(err&&err.message?err.message:err)); }
+  };
+  try{ confirmSelectedDeliveries=window.confirmSelectedDeliveries; }catch(e){}
+
+  // Direct confirmDelivery is also made index-safe for single-line calls.
+  window.confirmDelivery=function(i,rerender=true){
+    const r=(state.releaseQueue||[])[i];
+    const qty=n((document.getElementById('deliv_'+i)||{}).value);
+    const remarks=String((document.getElementById('delivRem_'+i)||{}).value||'');
+    const ok=confirmDeliveryCaptured({id:r&&r.id,index:i,ref:r,qty,remarks});
+    if(ok && rerender){ try{ if(typeof save==='function') save(); if(typeof renderAll==='function') renderAll(); }catch(e){} }
+    return ok;
+  };
+  try{ confirmDelivery=window.confirmDelivery; }catch(e){}
+  try{ const footer=document.querySelector('.footer'); if(footer) footer.textContent='DuPod Production Control System v1.10.88'; document.title='DuPod Production Control System v1.10.88'; }catch(e){}
 })();
 </script>
 
